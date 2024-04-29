@@ -7,6 +7,16 @@ permissions:
   contents: read
 
 jobs:
+  # Formatting for .yaml, .md, and other not-Rust things.
+  prettier:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm install --global prettier@3.2.5
+      - run: npx prettier --ignore-path .gitignore --write .
+      - run: git diff --exit-code
+
   cargo-fmt:
     runs-on: ubuntu-22.04
     timeout-minutes: 30
