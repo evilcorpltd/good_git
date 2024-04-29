@@ -26,7 +26,7 @@ struct InitArgs {
     branch: String,
 }
 
-fn init_repo(path: &PathBuf, branch_name: &String) -> Result<()> {
+fn init_repo(path: &PathBuf, branch_name: &str) -> Result<()> {
     let repo_path = path;
     let git_folder = path.join(".git");
     println!("Initializing repo {repo_path:?} with branch {branch_name}");
@@ -50,4 +50,20 @@ fn main() -> Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_init_repo() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let path = tmpdir.path().to_path_buf();
+        init_repo(&path, "bestbranch").unwrap();
+        assert_eq!(
+            fs::read_to_string(path.join(".git/HEAD")).unwrap(),
+            "ref: refs/heads/bestbranch"
+        );
+    }
 }
