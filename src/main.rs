@@ -1,5 +1,7 @@
+use anyhow::anyhow;
 use anyhow::Result;
-use std::{fs, path::PathBuf};
+use object::Object;
+use std::{fs, path::Path, path::PathBuf};
 
 use clap::{Args, Parser, Subcommand};
 use std::io;
@@ -21,6 +23,9 @@ enum Commands {
 
     /// Calculates the hash of an object.
     HashObject(HashObjectArgs),
+
+    /// Prints contents of an object.
+    CatFile(CatFileArgs),
 }
 
 #[derive(Args)]
@@ -35,6 +40,11 @@ struct InitArgs {
 #[derive(Args)]
 struct HashObjectArgs {
     file: PathBuf,
+}
+
+#[derive(Args)]
+struct CatFileArgs {
+    object: String,
 }
 
 fn init_repo(path: &PathBuf, branch_name: &str) -> Result<()> {
@@ -61,6 +71,25 @@ fn hash_object(file: &PathBuf, stdout: &mut dyn io::Write) -> Result<()> {
     Ok(())
 }
 
+fn cat_file(repo_path: &Path, object_hash: &str, stdout: &mut dyn io::Write) -> Result<()> {
+    // TODO: add better lookup of .git dir
+    let objects_dir = repo_path.join(".git/objects");
+
+    let (directory, file) = object_hash.split_at(2);
+    let object_file = objects_dir.join(directory).join(file);
+    // TODO: support finding the file from a short hash.
+    let object = Object::from_file(&object_file).ok_or_else(|| anyhow!("Could not find object"))?;
+
+    match object {
+        Object::Blob(blob) => {
+            let content = std::str::from_utf8(&blob.content)?;
+            writeln!(stdout, "{content}")?;
+        }
+    }
+
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
@@ -71,12 +100,19 @@ fn main() -> Result<()> {
         Commands::HashObject(hash_object_args) => {
             hash_object(&hash_object_args.file, &mut io::stdout())?;
         }
+        Commands::CatFile(cat_file_args) => {
+            let repo_path = Path::new(".");
+            cat_file(repo_path, &cat_file_args.object, &mut io::stdout())?;
+        }
     }
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
+    use flate2::{write::ZlibEncoder, Compression};
+    use std::io::prelude::*;
+
     use super::*;
 
     #[test]
@@ -100,5 +136,32 @@ mod tests {
         std::fs::write(&path, b"test content\n").ok();
         hash_object(&path, &mut stdout).unwrap();
         assert_eq!(stdout, b"d670460b4b4aece5915caf5c68d12f560a9fe3e4\n");
+    }
+
+    #[test]
+    fn test_cat_file() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let path = tmpdir
+            .path()
+            .to_path_buf()
+            .join(".git/objects/d6/70460b4b4aece5915caf5c68d12f560a9fe3e4");
+        let mut stdout = Vec::new();
+
+        let prefix = path.parent().unwrap();
+        std::fs::create_dir_all(prefix).unwrap();
+
+        // Compress the content of the blob object and write to file
+        let mut e = ZlibEncoder::new(Vec::new(), Compression::default());
+        e.write_all(b"blob 13\0test content\n").unwrap();
+        let compressed = e.finish().unwrap();
+        std::fs::write(&path, compressed).unwrap();
+
+        cat_file(
+            tmpdir.path(),
+            "d670460b4b4aece5915caf5c68d12f560a9fe3e4",
+            &mut stdout,
+        )
+        .unwrap();
+        assert_eq!(stdout, b"test content\n\n");
     }
 }
