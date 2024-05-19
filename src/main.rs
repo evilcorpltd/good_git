@@ -1,12 +1,14 @@
 use anyhow::anyhow;
 use anyhow::Result;
 use object::Object;
+use repo::Repo;
 use std::{fs, path::Path, path::PathBuf};
 
 use clap::{Args, Parser, Subcommand};
 use std::io;
 
 mod object;
+mod repo;
 
 #[derive(Parser)]
 #[command(version)]
@@ -47,9 +49,9 @@ struct CatFileArgs {
     object: String,
 }
 
-fn init_repo(path: &PathBuf, branch_name: &str) -> Result<()> {
-    let repo_path = path;
-    let git_folder = path.join(".git");
+fn init_repo(repo: &Repo, branch_name: &str) -> Result<()> {
+    let repo_path = &repo.root;
+    let git_folder = repo.git_dir();
     println!("Initializing repo {repo_path:?} with branch {branch_name}");
 
     fs::create_dir_all(repo_path)?;
@@ -71,9 +73,8 @@ fn hash_object(file: &PathBuf, stdout: &mut dyn io::Write) -> Result<()> {
     Ok(())
 }
 
-fn cat_file(repo_path: &Path, object_hash: &str, stdout: &mut dyn io::Write) -> Result<()> {
-    // TODO: add better lookup of .git dir
-    let objects_dir = repo_path.join(".git/objects");
+fn cat_file(repo: &Repo, object_hash: &str, stdout: &mut dyn io::Write) -> Result<()> {
+    let objects_dir = repo.git_dir().join("objects");
 
     let (directory, file) = object_hash.split_at(2);
     let object_file = objects_dir.join(directory).join(file);
@@ -95,14 +96,15 @@ fn main() -> Result<()> {
 
     match &cli.command {
         Commands::Init(init_args) => {
-            init_repo(&init_args.path, &init_args.branch)?;
+            init_repo(&Repo::new(&init_args.path), &init_args.branch)?;
         }
         Commands::HashObject(hash_object_args) => {
             hash_object(&hash_object_args.file, &mut io::stdout())?;
         }
         Commands::CatFile(cat_file_args) => {
-            let repo_path = Path::new(".");
-            cat_file(repo_path, &cat_file_args.object, &mut io::stdout())?;
+            let repo = Repo::from_dir(Path::new("."))
+                .ok_or_else(|| anyhow!("Could not find a valid git repository"))?;
+            cat_file(&repo, &cat_file_args.object, &mut io::stdout())?;
         }
     }
     Ok(())
@@ -119,7 +121,7 @@ mod tests {
     fn test_init_repo() {
         let tmpdir = tempfile::tempdir().unwrap();
         let path = tmpdir.path().to_path_buf();
-        init_repo(&path, "bestbranch").unwrap();
+        init_repo(&Repo::new(&path), "bestbranch").unwrap();
         assert_eq!(
             fs::read_to_string(path.join(".git/HEAD")).unwrap(),
             "ref: refs/heads/bestbranch"
@@ -157,7 +159,7 @@ mod tests {
         std::fs::write(&path, compressed).unwrap();
 
         cat_file(
-            tmpdir.path(),
+            &Repo::new(tmpdir.path()),
             "d670460b4b4aece5915caf5c68d12f560a9fe3e4",
             &mut stdout,
         )
