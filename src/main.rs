@@ -92,6 +92,18 @@ fn cat_file(repo: &Repo, object_hash: &str, stdout: &mut dyn io::Write) -> Resul
             let content = std::str::from_utf8(&blob.content)?;
             writeln!(stdout, "{content}")?;
         }
+        Object::Tree(tree) => {
+            for file in tree.files {
+                writeln!(
+                    stdout,
+                    "{:>6} {:>4} {:43} {}",
+                    file.mode,
+                    file.type_str(),
+                    file.hash,
+                    file.name
+                )?;
+            }
+        }
     }
 
     Ok(())
