@@ -1,3 +1,4 @@
+use anyhow::{anyhow, Result};
 use flate2::read::ZlibDecoder;
 use sha1::{Digest, Sha1};
 use std::io::prelude::*;
@@ -27,16 +28,17 @@ pub enum Object {
 }
 
 impl Object {
-    pub fn from_bytes(s: &[u8]) -> Option<Object> {
-        if s.len() > 4 && &s[0..4] == b"blob" {
-            // TODO: validate length in header
-            if let Some(null_index) = s.iter().position(|&x| x == b'\0') {
-                let d = s[null_index + 1..].to_vec();
-                let blob = Blob::new(d);
-                return Some(Object::Blob(blob));
+    pub fn from_bytes(s: &[u8]) -> Result<Object> {
+        let (object_type, _object_size, header_end) = Object::parse_header(s)?;
+        let content = &s[header_end + 1..];
+
+        match object_type.as_str() {
+            "blob" => {
+                let blob = Blob::new(content.to_vec());
+                Ok(Object::Blob(blob))
             }
+            _ => Err(anyhow!("Unknown object type")),
         }
-        None
     }
 
     pub fn from_file(path: &std::path::Path) -> Option<Object> {
@@ -45,7 +47,27 @@ impl Object {
         let mut s: Vec<u8> = vec![];
         z.read_to_end(&mut s).ok()?;
 
-        Object::from_bytes(&s)
+        Object::from_bytes(&s).ok()
+    }
+
+    /// Parse the header of a git object.
+    ///
+    /// The header is in the format: [object type] [object size]\0
+    ///
+    /// Returns the type, object size and the index where the header ends.
+    fn parse_header(s: &[u8]) -> Result<(String, usize, usize)> {
+        let space_index = s
+            .iter()
+            .position(|&x| x == b' ')
+            .ok_or(anyhow!("Incorrect header format"))?;
+        let null_index = s
+            .iter()
+            .position(|&x| x == b'\0')
+            .ok_or(anyhow!("Incorrect header format"))?;
+        let object_type = std::str::from_utf8(&s[..space_index])?;
+        let object_size = std::str::from_utf8(&s[space_index + 1..null_index])?;
+        let object_size = object_size.parse::<usize>()?;
+        Ok((object_type.to_string(), object_size, null_index))
     }
 }
 
@@ -61,6 +83,25 @@ mod tests {
     use super::hash;
     use super::Blob;
     use super::Object;
+    #[test]
+    fn test_object_parse_header() {
+        assert_eq!(
+            Object::parse_header(b"blob 16\0").unwrap(),
+            ("blob".to_string(), 16, 7)
+        );
+    }
+
+    #[test]
+    fn test_object_parse_header_incorrect_format() {
+        assert_eq!(
+            Object::parse_header(b"blob 16").unwrap_err().to_string(),
+            "Incorrect header format"
+        );
+        assert_eq!(
+            Object::parse_header(b"blob").unwrap_err().to_string(),
+            "Incorrect header format"
+        );
+    }
 
     #[test]
     fn test_blob_from_bytes() {
