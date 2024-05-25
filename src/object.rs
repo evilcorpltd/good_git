@@ -23,14 +23,19 @@ impl Blob {
     }
 }
 
+#[derive(Debug)]
 pub enum Object {
     Blob(Blob),
 }
 
 impl Object {
     pub fn from_bytes(s: &[u8]) -> Result<Object> {
-        let (object_type, _object_size, header_end) = Object::parse_header(s)?;
+        let (object_type, object_size, header_end) = Object::parse_header(s)?;
         let content = &s[header_end + 1..];
+
+        if content.len() != object_size {
+            return Err(anyhow!("Incorrect header length"));
+        }
 
         match object_type.as_str() {
             "blob" => {
@@ -109,6 +114,13 @@ mod tests {
         let object = Object::from_bytes(s.as_ref()).unwrap();
         let Object::Blob(blob) = object;
         assert_eq!(blob.content, b"what is up, doc?");
+    }
+
+    #[test]
+    fn test_object_from_bytes_incorrect_header_size() {
+        let s = b"blob 0\0hi";
+        let err = Object::from_bytes(s.as_ref()).unwrap_err().to_string();
+        assert_eq!(err, "Incorrect header length");
     }
 
     #[test]
