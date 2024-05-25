@@ -79,7 +79,7 @@ fn cat_file(repo: &Repo, object_hash: &str, stdout: &mut dyn io::Write) -> Resul
     let (directory, file) = object_hash.split_at(2);
     let object_file = objects_dir.join(directory).join(file);
     // TODO: support finding the file from a short hash.
-    let object = Object::from_file(&object_file).ok_or_else(|| anyhow!("Could not find object"))?;
+    let object = Object::from_file(&object_file)?;
 
     match object {
         Object::Blob(blob) => {
