@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use flate2::read::ZlibDecoder;
 use sha1::{Digest, Sha1};
 use std::io::prelude::*;
@@ -46,13 +46,13 @@ impl Object {
         }
     }
 
-    pub fn from_file(path: &std::path::Path) -> Option<Object> {
-        let data = std::fs::read(path).ok()?;
+    pub fn from_file(path: &std::path::Path) -> Result<Object> {
+        let data = std::fs::read(path).context("Could not read from file")?;
         let mut z = ZlibDecoder::new(&data[..]);
         let mut s: Vec<u8> = vec![];
-        z.read_to_end(&mut s).ok()?;
+        z.read_to_end(&mut s)?;
 
-        Object::from_bytes(&s).ok()
+        Object::from_bytes(&s)
     }
 
     /// Parse the header of a git object.
