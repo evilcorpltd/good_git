@@ -41,7 +41,12 @@ struct InitArgs {
 
 #[derive(Args)]
 struct HashObjectArgs {
-    file: PathBuf,
+    /// Read the object from stdin instead of from a file.
+    #[arg(long)]
+    stdin: bool,
+
+    #[arg(required_unless_present("stdin"))]
+    file: Option<PathBuf>,
 }
 
 #[derive(Args)]
@@ -100,8 +105,16 @@ fn main() -> Result<()> {
             init_repo(&Repo::new(&init_args.path), &init_args.branch)?;
         }
         Commands::HashObject(hash_object_args) => {
-            let f = fs::File::open(&hash_object_args.file)?;
-            hash_object(&mut io::BufReader::new(f), &mut io::stdout())?;
+            if hash_object_args.stdin {
+                hash_object(&mut io::stdin(), &mut io::stdout())?;
+            } else {
+                let f = hash_object_args
+                    .file
+                    .clone()
+                    .expect("<file> is required when --stdin isn't set");
+                let f = fs::File::open(f)?;
+                hash_object(&mut io::BufReader::new(f), &mut io::stdout())?;
+            }
         }
         Commands::CatFile(cat_file_args) => {
             let repo = Repo::from_dir(Path::new("."))
