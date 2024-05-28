@@ -64,8 +64,9 @@ fn init_repo(repo: &Repo, branch_name: &str) -> Result<()> {
     Ok(())
 }
 
-fn hash_object(file: &PathBuf, stdout: &mut dyn io::Write) -> Result<()> {
-    let data = std::fs::read(file)?;
+fn hash_object(object: &mut dyn io::Read, stdout: &mut dyn io::Write) -> Result<()> {
+    let mut data = Vec::new();
+    object.read_to_end(&mut data)?;
     let blob = object::Blob::new(data);
     let hash = blob.hash();
 
@@ -99,7 +100,8 @@ fn main() -> Result<()> {
             init_repo(&Repo::new(&init_args.path), &init_args.branch)?;
         }
         Commands::HashObject(hash_object_args) => {
-            hash_object(&hash_object_args.file, &mut io::stdout())?;
+            let f = fs::File::open(&hash_object_args.file)?;
+            hash_object(&mut io::BufReader::new(f), &mut io::stdout())?;
         }
         Commands::CatFile(cat_file_args) => {
             let repo = Repo::from_dir(Path::new("."))
@@ -136,7 +138,11 @@ mod tests {
 
         // From https://git-scm.com/book/sv/v2/Git-Internals-Git-Objects
         std::fs::write(&path, b"test content\n").ok();
-        hash_object(&path, &mut stdout).unwrap();
+        hash_object(
+            &mut io::BufReader::new(fs::File::open(path).unwrap()),
+            &mut stdout,
+        )
+        .unwrap();
         assert_eq!(stdout, b"d670460b4b4aece5915caf5c68d12f560a9fe3e4\n");
     }
 
