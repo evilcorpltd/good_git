@@ -145,17 +145,10 @@ mod tests {
 
     #[test]
     fn test_hash_object() {
-        let tmpdir = tempfile::tempdir().unwrap();
-        let path = tmpdir.path().to_path_buf().join("file.txt");
         let mut stdout = Vec::new();
 
         // From https://git-scm.com/book/sv/v2/Git-Internals-Git-Objects
-        std::fs::write(&path, b"test content\n").ok();
-        hash_object(
-            &mut io::BufReader::new(fs::File::open(path).unwrap()),
-            &mut stdout,
-        )
-        .unwrap();
+        hash_object(&mut "test content\n".as_bytes(), &mut stdout).unwrap();
         assert_eq!(stdout, b"d670460b4b4aece5915caf5c68d12f560a9fe3e4\n");
     }
 
