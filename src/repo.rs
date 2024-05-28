@@ -34,7 +34,12 @@ mod tests {
 
     #[test]
     fn test_from_dir_in_sub_dir() {
-        let tmpdir = tempfile::tempdir().unwrap().path().to_path_buf();
+        let tmpdir = tempfile::tempdir()
+            .unwrap()
+            .path()
+            .to_path_buf()
+            .canonicalize()
+            .unwrap();
         let git_dir = tmpdir.join(GIT_FOLDER_NAME);
         std::fs::create_dir_all(&git_dir).unwrap();
 
