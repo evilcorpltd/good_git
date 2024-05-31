@@ -104,6 +104,13 @@ fn cat_file(repo: &Repo, object_hash: &str, stdout: &mut dyn io::Write) -> Resul
                 )?;
             }
         }
+        Object::Commit(commit) => {
+            writeln!(stdout, "tree: {}", commit.tree)?;
+            writeln!(stdout, "parent: {}", commit.parent)?;
+            writeln!(stdout, "author: {}", commit.author)?;
+            writeln!(stdout, "committer: {}", commit.committer)?;
+            writeln!(stdout, "\n{}", commit.message)?;
+        }
     }
 
     Ok(())
