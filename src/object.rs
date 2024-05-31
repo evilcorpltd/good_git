@@ -60,10 +60,25 @@ impl File {
     }
 }
 
+#[derive(Debug, Default)]
+pub struct Commit {
+    // Git seems to only consider the following standard headers:
+    // https://github.com/git/git/blob/7b0defb3915eaa0bd118f0996e8c00b4eb2dc1ca/commit.c#L1442
+    // TOOD: support merge commits.
+    pub tree: String,
+    pub parent: String,
+    pub author: String,
+    pub committer: String,
+    pub encoding: String,
+
+    pub message: String,
+}
+
 #[derive(Debug)]
 pub enum Object {
     Blob(Blob),
     Tree(Tree),
+    Commit(Commit),
 }
 
 impl Object {
@@ -111,6 +126,43 @@ impl Object {
                 }
                 let tree = Tree::new(files);
                 Ok(Object::Tree(tree))
+            }
+            "commit" => {
+                let content_str = std::str::from_utf8(content)?;
+                let mut lines = content_str.lines();
+
+                let mut commit = Commit::default();
+
+                // Format is:
+                // [key] [value]
+                // ...
+                // <empty line>
+                // [commit message]
+                while let Some(line) = lines.next() {
+                    if line.is_empty() {
+                        // End of commit header, everything after is the commit message
+                        let value = lines.collect::<Vec<_>>().join("\n");
+                        commit.message = value;
+                        break;
+                    }
+                    let (key, value) = line.split_once(' ').ok_or(anyhow!("Invalid line"))?;
+                    let value = value.to_string();
+                    if key == "tree" {
+                        commit.tree = value;
+                    } else if key == "parent" {
+                        commit.parent = value;
+                    } else if key == "author" {
+                        commit.author = value;
+                    } else if key == "committer" {
+                        commit.committer = value;
+                    } else if key == "encoding" {
+                        commit.encoding = value;
+                    } else {
+                        // TODO: unknown key. Should we handle it?
+                    }
+                }
+
+                Ok(Object::Commit(commit))
             }
             _ => Err(anyhow!("Unknown object type")),
         }
@@ -220,6 +272,40 @@ mod tests {
                 },
             ]
         );
+    }
+
+    #[test]
+    fn test_object_from_bytes_for_commit() {
+        let s = b"commit 118\0\
+tree abc123
+parent 987xyz
+author good_git <good@git.com> 1234 +0100
+
+Add good git
+
+This commit adds a good git client
+";
+        let object = Object::from_bytes(s.as_ref()).unwrap();
+        let Object::Commit(commit) = object else {
+            panic!("Expected a commit");
+        };
+        assert_eq!(commit.tree, "abc123");
+        assert_eq!(commit.parent, "987xyz");
+        assert_eq!(commit.author, "good_git <good@git.com> 1234 +0100");
+        assert_eq!(commit.committer, "");
+        assert_eq!(
+            commit.message,
+            "Add good git\n\nThis commit adds a good git client"
+        );
+    }
+
+    #[test]
+    fn test_object_from_bytes_for_commit_with_incorrect_format() {
+        let s = b"commit 18\0\
+tree abc123
+parent";
+        let err = Object::from_bytes(s.as_ref()).unwrap_err().to_string();
+        assert_eq!(err, "Invalid line");
     }
 
     #[test]
