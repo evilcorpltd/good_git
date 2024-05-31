@@ -64,6 +64,38 @@ pub fn cat_file(repo: &Repo, object_hash: &str, stdout: &mut dyn io::Write) -> R
     Ok(())
 }
 
+pub fn log(repo: &Repo, object_rev: &str, stdout: &mut dyn io::Write) -> Result<()> {
+    let mut next_object_rev = Some(object_rev.to_string());
+
+    while let Some(this_rev) = &next_object_rev {
+        let current_object = Object::from_rev(repo, this_rev)?;
+
+        match current_object {
+            Object::Blob(_) => {
+                return Ok(());
+            }
+            Object::Tree(_) => {
+                return Ok(());
+            }
+            Object::Commit(commit) => {
+                let commiter = commit.committer;
+                let first_line = commit.message.lines().next().unwrap_or("");
+                writeln!(
+                    stdout,
+                    "{hash} - {first_line} - \"{commiter}\"",
+                    hash = &this_rev[0..6]
+                )?;
+                if commit.parent.is_empty() {
+                    return Ok(());
+                } else {
+                    next_object_rev = Some(commit.parent.clone());
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -23,6 +23,9 @@ enum Commands {
 
     /// Prints contents of an object.
     CatFile(CatFileArgs),
+
+    /// Show a log of the history.
+    Log(LogArgs),
 }
 
 #[derive(Args)]
@@ -49,6 +52,11 @@ struct CatFileArgs {
     object: String,
 }
 
+#[derive(Args)]
+struct LogArgs {
+    object: String,
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
@@ -72,6 +80,11 @@ fn main() -> Result<()> {
             let repo = Repo::from_dir(Path::new("."))
                 .ok_or_else(|| anyhow!("Could not find a valid git repository"))?;
             good_git::cat_file(&repo, &cat_file_args.object, &mut io::stdout())?;
+        }
+        Commands::Log(log_args) => {
+            let repo = Repo::from_dir(Path::new("."))
+                .ok_or_else(|| anyhow!("Could not find a valid git repository"))?;
+            good_git::log(&repo, &log_args.object, &mut io::stdout())?;
         }
     }
     Ok(())
