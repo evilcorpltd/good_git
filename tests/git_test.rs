@@ -125,7 +125,25 @@ fn test_repo() -> tempfile::TempDir {
         encoding: "".to_string(),
         message: "This is a good commit".to_string(),
     };
-    create_commit(git_dir, "aaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbb", &commit);
+    create_commit(
+        git_dir.clone(),
+        "aaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbb",
+        &commit,
+    );
+
+    let commit = Commit {
+        tree: "99887766554433221100aabbccddeeff00112233".to_string(),
+        parent: "aaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbb".to_string(),
+        author: "Captain Nemo <nemo@nautilus.sea>".to_string(),
+        committer: "Sherlock Holmes <sherlock@baker.street>".to_string(),
+        encoding: "".to_string(),
+        message: "Here is a better commit".to_string(),
+    };
+    create_commit(
+        git_dir.clone(),
+        "ccccccccccccccccccccdddddddddddddddddddd",
+        &commit,
+    );
 
     tmpdir
 }
@@ -231,6 +249,26 @@ committer: Alice <bye@alice.test>
 
 This is a good commit
 "
+        );
+    }
+
+    #[rstest]
+    fn test_log(test_repo: tempfile::TempDir) {
+        let repo = Repo::new(test_repo.path());
+        let mut stdout = Vec::new();
+
+        good_git::log(
+            &repo,
+            "ccccccccccccccccccccdddddddddddddddddddd",
+            &mut stdout,
+        )
+        .unwrap();
+        assert_eq!(
+            stdout,
+            b"\
+cccccc - Here is a better commit - \"Sherlock Holmes <sherlock@baker.street>\"
+aaaaaa - This is a good commit - \"Alice <bye@alice.test>\"
+",
         );
     }
 }
