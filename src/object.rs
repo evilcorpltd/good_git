@@ -1,7 +1,9 @@
 use anyhow::{anyhow, Context, Result};
 use flate2::read::ZlibDecoder;
 use sha1::{Digest, Sha1};
-use std::io::prelude::*;
+use std::{fs, io::prelude::*};
+
+use crate::repo::Repo;
 
 #[derive(Debug)]
 pub struct Blob {
@@ -175,6 +177,51 @@ impl Object {
         z.read_to_end(&mut s)?;
 
         Object::from_bytes(&s)
+    }
+
+    /// Returns an object from a hash in a git repository.
+    pub fn from_hash(repo: &Repo, hash: &str) -> Result<Object> {
+        let (short_hash, long_hash) = hash.split_at_checked(2).ok_or(anyhow!("Invalid hash"))?;
+        let path = repo
+            .git_dir()
+            .join("objects")
+            .join(short_hash)
+            .join(long_hash);
+        Object::from_file(&path)
+    }
+
+    /// Returns an object from a rev in a git repository.
+    ///
+    /// A rev can be a hash (long or short), a branch or a tag.
+    /// If no matches are found, an error is returned.
+    /// And error is also returned if the rev is ambiguous.
+    pub fn from_rev(repo: &Repo, rev: &str) -> Result<Object> {
+        let mut candidates: Vec<String> = vec![];
+
+        // Check if this is a hash
+        if rev.len() >= 4 {
+            let (short_hash, long_hash) = rev.split_at(2);
+            let path = repo.git_dir().join("objects").join(short_hash);
+
+            for entry in fs::read_dir(path)? {
+                let curr_path = entry?.path();
+                if let Some(file_name) = curr_path.file_name() {
+                    if let Some(file_name_str) = file_name.to_str() {
+                        if file_name_str.starts_with(long_hash) {
+                            candidates.push(format!("{}{}", short_hash, file_name_str));
+                        }
+                    }
+                }
+            }
+        }
+
+        // TODO: Check if this is a branch or a tag
+
+        match candidates.len() {
+            1 => Ok(Object::from_hash(repo, &candidates[0])?),
+            0 => Err(anyhow!("Object not found")),
+            _ => Err(anyhow!("Ambiguous reference: {:?}", candidates)),
+        }
     }
 
     /// Parse the header of a git object.
