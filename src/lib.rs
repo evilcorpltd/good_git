@@ -33,12 +33,7 @@ pub fn hash_object(object: &mut dyn io::Read, stdout: &mut dyn io::Write) -> Res
 }
 
 pub fn cat_file(repo: &Repo, object_hash: &str, stdout: &mut dyn io::Write) -> Result<()> {
-    let objects_dir = repo.git_dir().join("objects");
-
-    let (directory, file) = object_hash.split_at(2);
-    let object_file = objects_dir.join(directory).join(file);
-    // TODO: support finding the file from a short hash.
-    let object = Object::from_file(&object_file)?;
+    let object = Object::from_rev(repo, object_hash)?;
 
     match object {
         Object::Blob(blob) => {
@@ -121,5 +116,45 @@ mod tests {
         )
         .unwrap();
         assert_eq!(stdout, b"test content\n\n");
+    }
+
+    #[test]
+    fn test_cat_file_short_hash() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let path = tmpdir
+            .path()
+            .to_path_buf()
+            .join(".git/objects/d6/70460b4b4aece5915caf5c68d12f560a9fe3e4");
+        let mut stdout = Vec::new();
+
+        let prefix = path.parent().unwrap();
+        std::fs::create_dir_all(prefix).unwrap();
+
+        // Compress the content of the blob object and write to file
+        let mut e = ZlibEncoder::new(Vec::new(), Compression::default());
+        e.write_all(b"blob 13\0test content\n").unwrap();
+        let compressed = e.finish().unwrap();
+        std::fs::write(&path, compressed).unwrap();
+
+        cat_file(&Repo::new(tmpdir.path()), "d670", &mut stdout).unwrap();
+        assert_eq!(stdout, b"test content\n\n");
+    }
+
+    #[test]
+    fn test_cat_file_fails_if_rev_not_found() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let path = tmpdir
+            .path()
+            .to_path_buf()
+            .join(".git/objects/d6/70460b4b4aece5915caf5c68d12f560a9fe3e4");
+        let mut stdout = Vec::new();
+
+        let prefix = path.parent().unwrap();
+        std::fs::create_dir_all(prefix).unwrap();
+
+        let err = cat_file(&Repo::new(tmpdir.path()), "d6", &mut stdout)
+            .unwrap_err()
+            .to_string();
+        assert_eq!(err, "Object not found");
     }
 }
