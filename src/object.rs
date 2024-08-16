@@ -203,12 +203,14 @@ impl Object {
             let (short_hash, long_hash) = rev.split_at(2);
             let path = repo.git_dir().join("objects").join(short_hash);
 
-            for entry in fs::read_dir(path)? {
-                let curr_path = entry?.path();
-                if let Some(file_name) = curr_path.file_name() {
-                    if let Some(file_name_str) = file_name.to_str() {
-                        if file_name_str.starts_with(long_hash) {
-                            candidates.push(format!("{}{}", short_hash, file_name_str));
+            if path.exists() {
+                for entry in fs::read_dir(path)? {
+                    let curr_path = entry?.path();
+                    if let Some(file_name) = curr_path.file_name() {
+                        if let Some(file_name_str) = file_name.to_str() {
+                            if file_name_str.starts_with(long_hash) {
+                                candidates.push(format!("{}{}", short_hash, file_name_str));
+                            }
                         }
                     }
                 }

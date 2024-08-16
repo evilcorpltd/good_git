@@ -128,6 +128,7 @@ mod tests {
     #[case("")]
     #[case("d")]
     #[case("d6")]
+    #[case("hello")]
     fn test_cat_file_fails_if_rev_not_found(test_repo: tempfile::TempDir, #[case] input: String) {
         let repo = Repo::new(test_repo.path());
         let mut stdout = Vec::new();
