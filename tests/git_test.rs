@@ -1,5 +1,5 @@
 use flate2::{write::ZlibEncoder, Compression};
-use good_git::object::Tree;
+use good_git::object::{Commit, Tree};
 use good_git::repo::Repo;
 use rstest::fixture;
 use std::io::prelude::*;
@@ -48,6 +48,36 @@ fn create_tree(dir: PathBuf, hash: &str, tree: &Tree) {
     write_compressed_object(dir, hash, &full_bytes);
 }
 
+fn create_commit(dir: PathBuf, hash: &str, commit: &Commit) {
+    // Format is:
+    // [key] [value]
+    // ...
+    // <empty line>
+    // [commit message]
+    let content = format!(
+        "\
+tree {}
+encoding {}
+committer {}
+author {}
+parent {}
+
+{}",
+        commit.tree,
+        commit.encoding,
+        commit.committer,
+        commit.author,
+        commit.parent,
+        commit.message
+    )
+    .into_bytes();
+
+    let header = format!("commit {}\0", content.len()).into_bytes();
+    let full_bytes = [header, content].concat();
+
+    write_compressed_object(dir, hash, &full_bytes);
+}
+
 #[fixture]
 fn test_repo() -> tempfile::TempDir {
     let tmpdir = tempfile::tempdir().unwrap();
@@ -86,6 +116,17 @@ fn test_repo() -> tempfile::TempDir {
         "99887766554433221100aabbccddeeff00112233",
         &tree,
     );
+
+    let commit = Commit {
+        tree: "99887766554433221100aabbccddeeff00112233".to_string(),
+        parent: "".to_string(),
+        author: "Bob <hello@bob.test>".to_string(),
+        committer: "Alice <bye@alice.test>".to_string(),
+        encoding: "".to_string(),
+        message: "This is a good commit".to_string(),
+    };
+    create_commit(git_dir, "aaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbb", &commit);
+
     tmpdir
 }
 
@@ -165,6 +206,30 @@ more content
 from a good client
 100644 blob d670460b4b4aece5915caf5c68d12f560a9fe3e4    test.txt
 100644 blob 1234567890abcdef1234567890abcdef12345678    more.txt
+"
+        );
+    }
+
+    #[rstest]
+    fn test_cat_file_commit(test_repo: tempfile::TempDir) {
+        let repo = Repo::new(test_repo.path());
+        let mut stdout = Vec::new();
+
+        good_git::cat_file(
+            &repo,
+            "aaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbb",
+            &mut stdout,
+        )
+        .unwrap();
+        assert_eq!(
+            stdout,
+            b"\
+tree: 99887766554433221100aabbccddeeff00112233
+parent: 
+author: Bob <hello@bob.test>
+committer: Alice <bye@alice.test>
+
+This is a good commit
 "
         );
     }
