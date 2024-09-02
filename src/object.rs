@@ -15,11 +15,11 @@ impl Blob {
         Blob { content }
     }
 
-    pub fn hash(self) -> String {
+    pub fn hash(&self) -> String {
         let size = self.content.len();
         let data = format!("blob {size}\0");
         let mut data = data.as_bytes().to_vec();
-        data.extend(self.content);
+        data.extend(self.content.as_slice());
 
         hash(&data)
     }
