@@ -271,4 +271,26 @@ aaaaaa - This is a good commit - \"Alice <bye@alice.test>\"
 ",
         );
     }
+
+    #[rstest]
+    fn test_hash_object_w(test_repo: tempfile::TempDir) {
+        // From https://git-scm.com/book/sv/v2/Git-Internals-Git-Objects
+        let repo = Repo::new(test_repo.path());
+        let mut stdout = Vec::new();
+
+        good_git::hash_object(
+            good_git::HashObjectMode::Write(&repo),
+            &mut "test content\n".as_bytes(),
+            &mut stdout,
+        )
+        .unwrap();
+
+        const EXPECTED_HASH: &str = "d670460b4b4aece5915caf5c68d12f560a9fe3e4\n";
+        assert_eq!(stdout, EXPECTED_HASH.as_bytes());
+        stdout.clear();
+
+        good_git::cat_file(&repo, EXPECTED_HASH.trim(), &mut stdout).unwrap();
+
+        assert_eq!(stdout, b"test content\n\n");
+    }
 }

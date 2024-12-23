@@ -39,6 +39,10 @@ struct InitArgs {
 
 #[derive(Args)]
 struct HashObjectArgs {
+    /// Write the object into the object database.
+    #[arg(short)]
+    write: bool,
+
     /// Read the object from stdin instead of from a file.
     #[arg(long)]
     stdin: bool,
@@ -65,15 +69,25 @@ fn main() -> Result<()> {
             good_git::init_repo(&Repo::new(&init_args.path), &init_args.branch)?;
         }
         Commands::HashObject(hash_object_args) => {
+            let repo = Repo::from_dir(Path::new("."));
+            let mode = if hash_object_args.write {
+                good_git::HashObjectMode::Write(
+                    repo.as_ref()
+                        .ok_or_else(|| anyhow!("Could not find a valid git repository"))?,
+                )
+            } else {
+                good_git::HashObjectMode::HashOnly
+            };
+
             if hash_object_args.stdin {
-                hash_object(&mut io::stdin(), &mut io::stdout())?;
+                hash_object(mode, &mut io::stdin(), &mut io::stdout())?;
             } else {
                 let f = hash_object_args
                     .file
                     .clone()
                     .expect("<file> is required when --stdin isn't set");
                 let f = fs::File::open(f)?;
-                hash_object(&mut io::BufReader::new(f), &mut io::stdout())?;
+                hash_object(mode, &mut io::BufReader::new(f), &mut io::stdout())?;
             }
         }
         Commands::CatFile(cat_file_args) => {

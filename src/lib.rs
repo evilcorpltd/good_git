@@ -1,4 +1,7 @@
-use std::{fs, io};
+use std::{
+    fs,
+    io::{self, Write},
+};
 
 use anyhow::Result;
 use object::Object;
@@ -22,11 +25,34 @@ pub fn init_repo(repo: &Repo, branch_name: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn hash_object(object: &mut dyn io::Read, stdout: &mut dyn io::Write) -> Result<()> {
+pub enum HashObjectMode<'a> {
+    HashOnly,
+    Write(&'a Repo),
+}
+
+pub fn hash_object(
+    mode: HashObjectMode,
+    object: &mut dyn io::Read,
+    stdout: &mut dyn io::Write,
+) -> Result<()> {
     let mut data = Vec::new();
     object.read_to_end(&mut data)?;
     let blob = object::Blob::new(data);
     let hash = blob.hash();
+
+    if let HashObjectMode::Write(repo) = mode {
+        let dir = &repo.git_dir().join("objects").join(&hash[0..2]);
+        let file_path = dir.join(&hash[2..]);
+        let mut data = Vec::new();
+        let mut writer = flate2::write::ZlibEncoder::new(&mut data, flate2::Compression::default());
+        writer.write_all(b"blob ")?;
+        writer.write_all(blob.content.len().to_string().as_bytes())?;
+        writer.write_all(b"\0")?;
+        writer.write_all(&blob.content)?;
+        drop(writer);
+        fs::create_dir_all(dir)?;
+        fs::write(file_path, data)?;
+    }
 
     writeln!(stdout, "{hash}")?;
     Ok(())
@@ -116,7 +142,12 @@ mod tests {
         let mut stdout = Vec::new();
 
         // From https://git-scm.com/book/sv/v2/Git-Internals-Git-Objects
-        hash_object(&mut "test content\n".as_bytes(), &mut stdout).unwrap();
+        hash_object(
+            HashObjectMode::HashOnly,
+            &mut "test content\n".as_bytes(),
+            &mut stdout,
+        )
+        .unwrap();
         assert_eq!(stdout, b"d670460b4b4aece5915caf5c68d12f560a9fe3e4\n");
     }
 }
