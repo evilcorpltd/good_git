@@ -71,7 +71,7 @@ pub fn cat_file(repo: &Repo, object_hash: &str, stdout: &mut dyn io::Write) -> R
                 writeln!(
                     stdout,
                     "{:>6} {:>4} {:43} {}",
-                    file.mode,
+                    file.mode.mode_str(),
                     file.type_str(),
                     file.hash,
                     file.name

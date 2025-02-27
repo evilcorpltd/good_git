@@ -1,5 +1,5 @@
 use flate2::{Compression, write::ZlibEncoder};
-use good_git::object::{Commit, Tree};
+use good_git::object::{Commit, Mode, Tree};
 use good_git::repo::Repo;
 use rstest::fixture;
 use std::io::prelude::*;
@@ -33,7 +33,7 @@ fn create_tree(dir: PathBuf, hash: &str, tree: &Tree) {
         .files
         .iter()
         .flat_map(|file| {
-            let mut bytes = file.mode.as_bytes().to_vec();
+            let mut bytes = file.mode.mode_str().as_bytes().to_vec();
             bytes.push(b' ');
             bytes.extend(file.name.as_bytes());
             bytes.push(0);
@@ -100,12 +100,12 @@ fn test_repo() -> tempfile::TempDir {
     let tree = Tree {
         files: vec![
             good_git::object::File {
-                mode: "100644".to_string(),
+                mode: Mode::NormalFile,
                 hash: "d670460b4b4aece5915caf5c68d12f560a9fe3e4".to_string(),
                 name: "test.txt".to_string(),
             },
             good_git::object::File {
-                mode: "100644".to_string(),
+                mode: Mode::NormalFile,
                 hash: "1234567890abcdef1234567890abcdef12345678".to_string(),
                 name: "more.txt".to_string(),
             },
