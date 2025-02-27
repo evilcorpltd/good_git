@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use good_git::{hash_object, repo::Repo};
 use std::{fs, path::Path, path::PathBuf};
 

@@ -1,4 +1,4 @@
-use flate2::{write::ZlibEncoder, Compression};
+use flate2::{Compression, write::ZlibEncoder};
 use good_git::object::{Commit, Tree};
 use good_git::repo::Repo;
 use rstest::fixture;

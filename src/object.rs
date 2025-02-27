@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use flate2::read::ZlibDecoder;
 use sha1::{Digest, Sha1};
 use std::{fs, io::prelude::*};
@@ -258,9 +258,9 @@ pub fn hash(s: &[u8]) -> String {
 mod tests {
     use crate::object::File;
 
-    use super::hash;
     use super::Blob;
     use super::Object;
+    use super::hash;
     #[test]
     fn test_object_parse_header() {
         assert_eq!(
