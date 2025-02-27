@@ -37,27 +37,52 @@ impl Tree {
 }
 
 #[derive(Debug, PartialEq)]
+pub enum Mode {
+    NormalFile,
+    Executable,
+    SymbolicLink,
+    Tree,
+    Submodule,
+}
+
+impl Mode {
+    pub fn from_mode_str(mode: &str) -> Result<Mode> {
+        match mode {
+            "100644" => Ok(Mode::NormalFile),
+            "100755" => Ok(Mode::Executable),
+            "120000" => Ok(Mode::SymbolicLink),
+            "40000" => Ok(Mode::Tree),
+            "160000" => Ok(Mode::Submodule),
+            _ => Err(anyhow!("Unknown mode")),
+        }
+    }
+
+    pub fn mode_str(&self) -> &str {
+        match self {
+            Mode::NormalFile => "100644",
+            Mode::Executable => "100755",
+            Mode::SymbolicLink => "120000",
+            Mode::Tree => "40000",
+            Mode::Submodule => "160000",
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub struct File {
-    pub mode: String,
+    pub mode: Mode,
     pub name: String,
     pub hash: String,
 }
 
 impl File {
     pub fn type_str(&self) -> &str {
-        // Possible values:
-        // 100644: normal file (blob)
-        // 100755: executable file (blob)
-        // 120000: symbolic link
-        // 40000: tree
-        // 160000: submodule
-        match self.mode.as_str() {
-            "100644" => "blob",
-            "100755" => "blob",
-            "120000" => "symlink",
-            "40000" => "tree",
-            "160000" => "submodule",
-            _ => "unknown",
+        match self.mode {
+            Mode::NormalFile => "blob",
+            Mode::Executable => "blob",
+            Mode::SymbolicLink => "symlink",
+            Mode::Tree => "tree",
+            Mode::Submodule => "submodule",
         }
     }
 }
@@ -106,7 +131,8 @@ impl Object {
                     let mode_size = content
                         .read_until(b' ', &mut mode)
                         .context("Failed to read mode")?;
-                    let mode = std::str::from_utf8(&mode[..mode_size - 1])?;
+                    let mode = Mode::from_mode_str(std::str::from_utf8(&mode[..mode_size - 1])?)
+                        .context("Failed to parse mode")?;
 
                     let mut name = vec![];
                     let name_size = content
@@ -121,7 +147,7 @@ impl Object {
                     let hash = hex::encode(hash);
 
                     files.push(File {
-                        mode: mode.to_string(),
+                        mode,
                         name: name.to_string(),
                         hash,
                     });
@@ -259,6 +285,7 @@ mod tests {
     use crate::object::File;
 
     use super::Blob;
+    use super::Mode;
     use super::Object;
     use super::hash;
     #[test]
@@ -305,17 +332,17 @@ mod tests {
             tree.files,
             vec![
                 File {
-                    mode: "100644".to_string(),
+                    mode: Mode::NormalFile,
                     name: "file1.txt".to_string(),
                     hash: "0102030405060708090a0b0c0d0e0f1011121314".to_string(),
                 },
                 File {
-                    mode: "100644".to_string(),
+                    mode: Mode::NormalFile,
                     name: "file2.txt".to_string(),
                     hash: "5152535455565758595a5b5c5d5e5f6061626364".to_string(),
                 },
                 File {
-                    mode: "40000".to_string(),
+                    mode: Mode::Tree,
                     name: "folder".to_string(),
                     hash: "8182838485868788898a8b8c8d8e8f9091929394".to_string(),
                 },
@@ -363,6 +390,14 @@ parent";
             100644 file1.txt\0\x01";
         let err = Object::from_bytes(s.as_ref()).unwrap_err().to_string();
         assert_eq!(err, "Failed to read hash");
+    }
+
+    #[test]
+    fn test_object_from_bytes_for_tree_invalid_mode() {
+        let s = b"tree 7\0\
+            123456 ";
+        let err = Object::from_bytes(s.as_ref()).unwrap_err().to_string();
+        assert_eq!(err, "Failed to parse mode");
     }
 
     #[test]
