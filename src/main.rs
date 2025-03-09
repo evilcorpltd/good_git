@@ -26,6 +26,9 @@ enum Commands {
 
     /// Show a log of the history.
     Log(LogArgs),
+
+    /// Show a list of references
+    ShowRef(ShowRefArgs),
 }
 
 #[derive(Args)]
@@ -60,6 +63,9 @@ struct CatFileArgs {
 struct LogArgs {
     object: String,
 }
+
+#[derive(Args)]
+struct ShowRefArgs {}
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -99,6 +105,11 @@ fn main() -> Result<()> {
             let repo = Repo::from_dir(Path::new("."))
                 .ok_or_else(|| anyhow!("Could not find a valid git repository"))?;
             good_git::log(&repo, &log_args.object, &mut io::stdout())?;
+        }
+        Commands::ShowRef(_show_ref_args) => {
+            let repo = Repo::from_dir(Path::new("."))
+                .ok_or_else(|| anyhow!("Could not find a valid git repository"))?;
+            good_git::show_ref(&repo, &mut io::stdout())?;
         }
     }
     Ok(())

@@ -78,6 +78,11 @@ parent {}
     write_compressed_object(dir, hash, &full_bytes);
 }
 
+fn create_ref(dir: PathBuf, name: &str, content: &str) {
+    let ref_path = dir.join(".git/refs/heads").join(name);
+    std::fs::write(ref_path, content).unwrap();
+}
+
 #[fixture]
 fn test_repo() -> tempfile::TempDir {
     let tmpdir = tempfile::tempdir().unwrap();
@@ -143,6 +148,16 @@ fn test_repo() -> tempfile::TempDir {
         git_dir.clone(),
         "ccccccccccccccccccccdddddddddddddddddddd",
         &commit,
+    );
+    create_ref(
+        git_dir.clone(),
+        "main",
+        "aaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbb\n",
+    );
+    create_ref(
+        git_dir.clone(),
+        "better_commit",
+        "ccccccccccccccccccccdddddddddddddddddddd\n",
     );
 
     tmpdir
@@ -292,5 +307,20 @@ aaaaaa - This is a good commit - \"Alice <bye@alice.test>\"
         good_git::cat_file(&repo, EXPECTED_HASH.trim(), &mut stdout).unwrap();
 
         assert_eq!(stdout, b"test content\n\n");
+    }
+
+    #[rstest]
+    fn test_show_ref(test_repo: tempfile::TempDir) {
+        let repo = Repo::new(test_repo.path());
+        let mut stdout = Vec::new();
+
+        good_git::show_ref(&repo, &mut stdout).unwrap();
+        assert_eq!(
+            std::str::from_utf8(&stdout).unwrap(),
+            "\
+ccccccccccccccccccccdddddddddddddddddddd refs/heads/better_commit
+aaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbb refs/heads/main
+"
+        );
     }
 }
