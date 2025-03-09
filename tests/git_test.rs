@@ -244,16 +244,13 @@ from a good client
     }
 
     #[rstest]
-    fn test_cat_file_commit(test_repo: tempfile::TempDir) {
+    #[case("aaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbb")]
+    #[case("main")] // Points to the same commit
+    fn test_cat_file_commit(test_repo: tempfile::TempDir, #[case] reference: String) {
         let repo = Repo::new(test_repo.path());
         let mut stdout = Vec::new();
 
-        good_git::cat_file(
-            &repo,
-            "aaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbb",
-            &mut stdout,
-        )
-        .unwrap();
+        good_git::cat_file(&repo, &reference, &mut stdout).unwrap();
         assert_eq!(
             stdout,
             b"\

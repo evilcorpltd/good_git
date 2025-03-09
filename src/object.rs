@@ -3,7 +3,7 @@ use flate2::read::ZlibDecoder;
 use sha1::{Digest, Sha1};
 use std::{fs, io::prelude::*};
 
-use crate::repo::Repo;
+use crate::{refs, repo::Repo};
 
 #[derive(Debug)]
 pub struct Blob {
@@ -243,7 +243,11 @@ impl Object {
             }
         }
 
-        // TODO: Check if this is a branch or a tag
+        for reference in &[format!("refs/heads/{rev}"), format!("refs/tags/{rev}")] {
+            if let Ok(hash) = refs::find_ref(reference, repo) {
+                candidates.push(hash);
+            }
+        }
 
         match candidates.len() {
             1 => Ok(Object::from_hash(repo, &candidates[0])?),
