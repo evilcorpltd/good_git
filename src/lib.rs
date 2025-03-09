@@ -123,6 +123,52 @@ pub fn log(repo: &Repo, object_rev: &str, stdout: &mut dyn io::Write) -> Result<
     Ok(())
 }
 
+fn iter_subdirs(
+    path: &std::path::PathBuf,
+    callback: &mut dyn FnMut(&std::path::PathBuf) -> Result<()>,
+) -> Result<()> {
+    for entry in fs::read_dir(path)? {
+        let p = entry?.path();
+        if p.is_dir() {
+            iter_subdirs(&p, callback)?;
+        } else {
+            callback(&p)?;
+        }
+    }
+    Ok(())
+}
+
+pub fn show_ref(repo: &Repo, stdout: &mut dyn io::Write) -> Result<()> {
+    let mut found_refs: Vec<(String, String)> = vec![];
+
+    let mut add_ref_to_found = |path: &std::path::PathBuf| -> Result<()> {
+        let d = path.strip_prefix(repo.git_dir())?;
+        let ref_name = &d
+            .to_str()
+            .ok_or_else(|| anyhow::anyhow!("Invalid ref name"))?;
+        // Normalize path separators to handle Windows
+        let ref_name = ref_name.replace("\\", "/");
+        let hash = refs::find_ref(&ref_name, repo)?;
+        found_refs.push((ref_name.to_string(), hash));
+        Ok(())
+    };
+
+    for folder in &["heads", "remotes", "tags"] {
+        let path = repo.git_dir().join("refs").join(folder);
+        if path.is_dir() {
+            iter_subdirs(&path, &mut add_ref_to_found)?;
+        }
+    }
+
+    // Sort by ref name
+    found_refs.sort_by(|a, b| a.0.cmp(&b.0));
+    for (ref_name, hash) in found_refs {
+        writeln!(stdout, "{hash} {ref_name}")?;
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
