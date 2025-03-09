@@ -8,6 +8,7 @@ use object::Object;
 use repo::Repo;
 
 pub mod object;
+pub mod refs;
 pub mod repo;
 
 pub fn init_repo(repo: &Repo, branch_name: &str) -> Result<()> {
