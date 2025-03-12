@@ -107,11 +107,9 @@ pub fn log(repo: &Repo, object_rev: &str, stdout: &mut dyn io::Write) -> Result<
             Object::Commit(commit) => {
                 let commiter = commit.committer;
                 let first_line = commit.message.lines().next().unwrap_or("");
-                writeln!(
-                    stdout,
-                    "{hash} - {first_line} - \"{commiter}\"",
-                    hash = &this_rev[0..6]
-                )?;
+                // TODO: resolve all refs to their full hash.
+                // Now this_rev could be for example a branch name.
+                writeln!(stdout, "{this_rev:.6} - {first_line} - \"{commiter}\"",)?;
                 if commit.parent.is_empty() {
                     return Ok(());
                 } else {

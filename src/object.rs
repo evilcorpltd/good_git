@@ -227,6 +227,10 @@ impl Object {
     pub fn from_rev(repo: &Repo, rev: &str) -> Result<Object> {
         let mut candidates: Vec<String> = vec![];
 
+        if rev == "HEAD" {
+            return Object::from_hash(repo, &refs::find_ref("HEAD", repo)?);
+        }
+
         // Check if this is a hash
         if rev.len() >= 4 {
             let (short_hash, long_hash) = rev.split_at(2);
