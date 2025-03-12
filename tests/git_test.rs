@@ -169,24 +169,11 @@ mod tests {
     use rstest::rstest;
 
     #[rstest]
-    fn test_cat_file(test_repo: tempfile::TempDir) {
-        let repo = Repo::new(test_repo.path());
-        let mut stdout = Vec::new();
-
-        good_git::cat_file(
-            &repo,
-            "d670460b4b4aece5915caf5c68d12f560a9fe3e4",
-            &mut stdout,
-        )
-        .unwrap();
-        assert_eq!(stdout, b"test content\n\n");
-    }
-
-    #[rstest]
     #[case("d670", b"test content\n\n".to_vec())]
     #[case("d67046", b"test content\n\n".to_vec())]
+    #[case("d670460b4b4aece5915caf5c68d12f560a9fe3e4", b"test content\n\n".to_vec())]
     #[case("1234567890", b"more content\nfrom a good client\n".to_vec())]
-    fn test_cat_file_short_hash(
+    fn test_cat_file(
         test_repo: tempfile::TempDir,
         #[case] input: String,
         #[case] expected: Vec<u8>,
@@ -246,6 +233,7 @@ from a good client
     #[rstest]
     #[case("aaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbb")]
     #[case("main")] // Points to the same commit
+    #[case("HEAD")]
     fn test_cat_file_commit(test_repo: tempfile::TempDir, #[case] reference: String) {
         let repo = Repo::new(test_repo.path());
         let mut stdout = Vec::new();
