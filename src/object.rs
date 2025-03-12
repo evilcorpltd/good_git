@@ -197,6 +197,9 @@ impl Object {
     }
 
     pub fn from_file(path: &std::path::Path) -> Result<Object> {
+        if !path.exists() {
+            return Err(anyhow!("Expected file: {:?} does not exist", path));
+        }
         let data = std::fs::read(path).context("Could not read from file")?;
         let mut z = ZlibDecoder::new(&data[..]);
         let mut s: Vec<u8> = vec![];
@@ -286,6 +289,8 @@ pub fn hash(s: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
+    use tempfile::tempdir;
+
     use crate::object::File;
 
     use super::Blob;
@@ -409,6 +414,28 @@ parent";
         let s = b"blob 0\0hi";
         let err = Object::from_bytes(s.as_ref()).unwrap_err().to_string();
         assert_eq!(err, "Incorrect header length");
+    }
+
+    #[test]
+    fn test_from_file_nonexisting_file() {
+        let result = Object::from_file(std::path::Path::new("/nonexisting/file"));
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Expected file: \"/nonexisting/file\" does not exist"
+        );
+    }
+
+    #[test]
+    fn test_from_file_with_invalid_data() {
+        let dir = tempdir().unwrap();
+        let file_path = dir.path().join("invalid_object");
+
+        std::fs::write(&file_path, "not a valid git object").unwrap();
+
+        let result = Object::from_file(&file_path);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().to_string(), "corrupt deflate stream");
     }
 
     #[test]
