@@ -1,0 +1,41 @@
+load("@crates//:defs.bzl", "aliases", "all_crate_deps")
+load("@rules_rs//rs:rust_binary.bzl", "rust_binary")
+load("@rules_rs//rs:rust_library.bzl", "rust_library")
+load("@rules_rs//rs:rust_test.bzl", "rust_test")
+
+rust_library(
+    name = "good_git_lib",
+    srcs = glob(
+        ["src/**/*.rs"],
+        exclude = ["src/main.rs"],
+    ),
+    aliases = aliases(),
+    crate_name = "good_git",
+    version = "0.1.0",
+    deps = all_crate_deps(normal = True),
+)
+
+rust_binary(
+    name = "good_git",
+    srcs = ["src/main.rs"],
+    aliases = aliases(),
+    version = "0.1.0",
+    deps = all_crate_deps(normal = True) + [":good_git_lib"],
+)
+
+rust_test(
+    name = "unit_test",
+    crate = ":good_git_lib",
+    aliases = aliases(),
+    deps = all_crate_deps(normal_dev = True),
+)
+
+rust_test(
+    name = "git_test",
+    srcs = ["tests/git_test.rs"],
+    aliases = aliases(),
+    deps = all_crate_deps(
+        normal = True,
+        normal_dev = True,
+    ) + [":good_git_lib"],
+)

@@ -11,5 +11,5 @@ hex = "0.4.3"
 sha1 = "0.10.7"
 
 [dev-dependencies]
-rstest = "0.22.0"
+rstest = { version = "0.22.0", default-features = false }
 tempfile = "3.27.0"
