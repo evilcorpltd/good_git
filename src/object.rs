@@ -239,12 +239,11 @@ impl Object {
             if path.exists() {
                 for entry in fs::read_dir(path)? {
                     let curr_path = entry?.path();
-                    if let Some(file_name) = curr_path.file_name() {
-                        if let Some(file_name_str) = file_name.to_str() {
-                            if file_name_str.starts_with(long_hash) {
-                                candidates.push(format!("{}{}", short_hash, file_name_str));
-                            }
-                        }
+                    if let Some(file_name) = curr_path.file_name()
+                        && let Some(file_name_str) = file_name.to_str()
+                        && file_name_str.starts_with(long_hash)
+                    {
+                        candidates.push(format!("{}{}", short_hash, file_name_str));
                     }
                 }
             }
