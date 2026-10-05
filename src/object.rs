@@ -298,6 +298,10 @@ pub fn write_object(repo: &Repo, object_type: &str, content: &[u8]) -> Result<St
 
     let dir = repo.git_dir().join("objects").join(&hash[0..2]);
     let file_path = dir.join(&hash[2..]);
+    if file_path.exists() {
+        return Ok(hash);
+    }
+
     let mut encoder = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::default());
     encoder.write_all(&data)?;
     fs::create_dir_all(&dir)?;
@@ -479,6 +483,12 @@ parent";
 
         let hash = write_object(&repo, "blob", b"what is up, doc?").unwrap();
         assert_eq!(hash, "bd9dbf5aae1a3862dd1526723246b20206e5fc37");
+
+        // Writing the same object should not do anything.
+        assert_eq!(
+            write_object(&repo, "blob", b"what is up, doc?").unwrap(),
+            hash
+        );
 
         let Object::Blob(blob) = Object::from_hash(&repo, &hash).unwrap() else {
             panic!("Expected a Blob");
