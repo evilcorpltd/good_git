@@ -290,6 +290,21 @@ pub fn hash(s: &[u8]) -> String {
     hex::encode(hasher.finalize())
 }
 
+/// Writes an object to the git repository.
+pub fn write_object(repo: &Repo, object_type: &str, content: &[u8]) -> Result<String> {
+    let mut data = format!("{object_type} {}\0", content.len()).into_bytes();
+    data.extend(content);
+    let hash = hash(&data);
+
+    let dir = repo.git_dir().join("objects").join(&hash[0..2]);
+    let file_path = dir.join(&hash[2..]);
+    let mut encoder = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::default());
+    encoder.write_all(&data)?;
+    fs::create_dir_all(&dir)?;
+    fs::write(file_path, encoder.finish()?)?;
+    Ok(hash)
+}
+
 #[cfg(test)]
 mod tests {
     use tempfile::tempdir;
@@ -300,6 +315,8 @@ mod tests {
     use super::Mode;
     use super::Object;
     use super::hash;
+    use super::write_object;
+    use crate::repo::Repo;
     #[test]
     fn test_object_parse_header() {
         assert_eq!(
@@ -453,5 +470,19 @@ parent";
         // From https://git-scm.com/book/sv/v2/Git-Internals-Git-Objects
         let s = b"blob 16\0what is up, doc?";
         assert_eq!(hash(s), "bd9dbf5aae1a3862dd1526723246b20206e5fc37");
+    }
+
+    #[test]
+    fn test_write_object() {
+        let dir = tempdir().unwrap();
+        let repo = Repo::new(dir.path());
+
+        let hash = write_object(&repo, "blob", b"what is up, doc?").unwrap();
+        assert_eq!(hash, "bd9dbf5aae1a3862dd1526723246b20206e5fc37");
+
+        let Object::Blob(blob) = Object::from_hash(&repo, &hash).unwrap() else {
+            panic!("Expected a Blob");
+        };
+        assert_eq!(blob.content, b"what is up, doc?");
     }
 }

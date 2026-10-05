@@ -1,7 +1,4 @@
-use std::{
-    fs,
-    io::{self, Write},
-};
+use std::{fs, io};
 
 use anyhow::Result;
 use object::Object;
@@ -39,21 +36,10 @@ pub fn hash_object(
     let mut data = Vec::new();
     object.read_to_end(&mut data)?;
     let blob = object::Blob::new(data);
-    let hash = blob.hash();
-
-    if let HashObjectMode::Write(repo) = mode {
-        let dir = &repo.git_dir().join("objects").join(&hash[0..2]);
-        let file_path = dir.join(&hash[2..]);
-        let mut data = Vec::new();
-        let mut writer = flate2::write::ZlibEncoder::new(&mut data, flate2::Compression::default());
-        writer.write_all(b"blob ")?;
-        writer.write_all(blob.content.len().to_string().as_bytes())?;
-        writer.write_all(b"\0")?;
-        writer.write_all(&blob.content)?;
-        drop(writer);
-        fs::create_dir_all(dir)?;
-        fs::write(file_path, data)?;
-    }
+    let hash = match mode {
+        HashObjectMode::HashOnly => blob.hash(),
+        HashObjectMode::Write(repo) => object::write_object(repo, "blob", &blob.content)?,
+    };
 
     writeln!(stdout, "{hash}")?;
     Ok(())
