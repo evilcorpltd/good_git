@@ -181,4 +181,49 @@ mod tests {
         .unwrap();
         assert_eq!(stdout, b"d670460b4b4aece5915caf5c68d12f560a9fe3e4\n");
     }
+
+    #[test]
+    fn test_show_ref() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let repo = Repo::new(tmpdir.path());
+
+        fs::create_dir_all(repo.git_dir().join("refs/heads")).unwrap();
+        fs::create_dir_all(repo.git_dir().join("refs/tags")).unwrap();
+        fs::create_dir_all(repo.git_dir().join("refs/remotes/origin")).unwrap();
+
+        fs::write(
+            repo.git_dir().join("refs/heads/main"),
+            "1111111111111111111111111111111111111111\n",
+        )
+        .unwrap();
+
+        fs::write(
+            repo.git_dir().join("refs/heads/feature"),
+            "2222222222222222222222222222222222222222\n",
+        )
+        .unwrap();
+
+        fs::write(
+            repo.git_dir().join("refs/tags/v1"),
+            "3333333333333333333333333333333333333333\n",
+        )
+        .unwrap();
+
+        fs::write(
+            repo.git_dir().join("refs/remotes/origin/master"),
+            "4444444444444444444444444444444444444444\n",
+        )
+        .unwrap();
+
+        let mut stdout = Vec::new();
+        show_ref(&repo, &mut stdout).unwrap();
+
+        assert_eq!(
+            stdout,
+            b"2222222222222222222222222222222222222222 refs/heads/feature\n\
+          1111111111111111111111111111111111111111 refs/heads/main\n\
+          4444444444444444444444444444444444444444 refs/remotes/origin/master\n\
+          3333333333333333333333333333333333333333 refs/tags/v1\n"
+        );
+    }
 }
