@@ -173,7 +173,9 @@ impl Object {
                         commit.message = value;
                         break;
                     }
-                    let (key, value) = line.split_once(' ').ok_or(anyhow!("Invalid line"))?;
+                    let (key, value) = line
+                        .split_once(' ')
+                        .ok_or_else(|| anyhow!("Invalid line"))?;
                     let value = value.to_string();
                     if key == "tree" {
                         commit.tree = value;
@@ -210,7 +212,9 @@ impl Object {
 
     /// Returns an object from a hash in a git repository.
     pub fn from_hash(repo: &Repo, hash: &str) -> Result<Object> {
-        let (short_hash, long_hash) = hash.split_at_checked(2).ok_or(anyhow!("Invalid hash"))?;
+        let (short_hash, long_hash) = hash
+            .split_at_checked(2)
+            .ok_or_else(|| anyhow!("Invalid hash"))?;
         let path = repo
             .git_dir()
             .join("objects")
@@ -271,11 +275,11 @@ impl Object {
         let space_index = s
             .iter()
             .position(|&x| x == b' ')
-            .ok_or(anyhow!("Incorrect header format"))?;
+            .ok_or_else(|| anyhow!("Incorrect header format"))?;
         let null_index = s
             .iter()
             .position(|&x| x == b'\0')
-            .ok_or(anyhow!("Incorrect header format"))?;
+            .ok_or_else(|| anyhow!("Incorrect header format"))?;
         let object_type = std::str::from_utf8(&s[..space_index])?;
         let object_size = std::str::from_utf8(&s[space_index + 1..null_index])?;
         let object_size = object_size.parse::<usize>()?;
