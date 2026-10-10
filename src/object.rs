@@ -25,7 +25,7 @@ impl Blob {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Tree {
     pub files: Vec<File>,
 }
@@ -33,6 +33,20 @@ pub struct Tree {
 impl Tree {
     pub fn new(files: Vec<File>) -> Tree {
         Tree { files }
+    }
+
+    // Format (one per file/folder/tree/submodule):
+    // [mode] [object name]\0[SHA-1 in binary format (20 bytes)]
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        let mut bytes = Vec::new();
+        for file in &self.files {
+            bytes.extend(file.mode.mode_str().as_bytes());
+            bytes.push(b' ');
+            bytes.extend(file.name.as_bytes());
+            bytes.push(0);
+            bytes.extend(hex::decode(&file.hash).context("Invalid hash")?);
+        }
+        Ok(bytes)
     }
 }
 
@@ -322,9 +336,52 @@ mod tests {
     use super::Blob;
     use super::Mode;
     use super::Object;
+    use super::Tree;
     use super::hash;
     use super::write_object;
     use crate::repo::Repo;
+
+    #[test]
+    fn test_tree_to_bytes() {
+        let tree = Tree::new(vec![
+            File {
+                mode: Mode::NormalFile,
+                name: "a.txt".to_string(),
+                hash: "78981922613b2afb6025042ff6bd878ac1994e85".to_string(),
+            },
+            File {
+                mode: Mode::Tree,
+                name: "dir".to_string(),
+                hash: "ce013625030ba8dba906f756967f9e9ca394464a".to_string(),
+            },
+        ]);
+        let content = tree.to_bytes().unwrap();
+        let expected = [
+            b"100644 a.txt\0".as_slice(),
+            &hex::decode("78981922613b2afb6025042ff6bd878ac1994e85").unwrap(),
+            b"40000 dir\0",
+            &hex::decode("ce013625030ba8dba906f756967f9e9ca394464a").unwrap(),
+        ]
+        .concat();
+        assert_eq!(content, expected);
+
+        let data = [format!("tree {}\0", content.len()).into_bytes(), content].concat();
+        let Object::Tree(parsed) = Object::from_bytes(&data).unwrap() else {
+            panic!("expected a tree");
+        };
+        assert_eq!(parsed, tree);
+    }
+
+    #[test]
+    fn test_tree_to_bytes_invalid_hash() {
+        let tree = Tree::new(vec![File {
+            mode: Mode::NormalFile,
+            name: "a".to_string(),
+            hash: "zz".to_string(),
+        }]);
+        assert!(tree.to_bytes().is_err());
+    }
+
     #[test]
     fn test_object_parse_header() {
         assert_eq!(
