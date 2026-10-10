@@ -36,28 +36,7 @@ fn create_tree(dir: PathBuf, hash: &str, tree: &Tree) {
 }
 
 fn create_commit(dir: PathBuf, hash: &str, commit: &Commit) {
-    // Format is:
-    // [key] [value]
-    // ...
-    // <empty line>
-    // [commit message]
-    let content = format!(
-        "\
-tree {}
-encoding {}
-committer {}
-author {}
-parent {}
-
-{}",
-        commit.tree,
-        commit.encoding,
-        commit.committer,
-        commit.author,
-        commit.parent,
-        commit.message
-    )
-    .into_bytes();
+    let content = commit.to_bytes();
 
     let header = format!("commit {}\0", content.len()).into_bytes();
     let full_bytes = [header, content].concat();
