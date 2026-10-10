@@ -101,7 +101,7 @@ impl File {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 pub struct Commit {
     // Git seems to only consider the following standard headers:
     // https://github.com/git/git/blob/7b0defb3915eaa0bd118f0996e8c00b4eb2dc1ca/commit.c#L1442
@@ -113,6 +113,33 @@ pub struct Commit {
     pub encoding: String,
 
     pub message: String,
+}
+
+impl Commit {
+    // Format is:
+    // [key] [value]
+    // ...
+    // <empty line>
+    // [commit message]
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut headers = vec![("tree", &self.tree)];
+        if !self.parent.is_empty() {
+            headers.push(("parent", &self.parent));
+        }
+        headers.push(("author", &self.author));
+        headers.push(("committer", &self.committer));
+        if !self.encoding.is_empty() {
+            headers.push(("encoding", &self.encoding));
+        }
+
+        let mut content = String::new();
+        for (key, value) in headers {
+            content.push_str(&format!("{key} {value}\n"));
+        }
+        content.push('\n');
+        content.push_str(&self.message);
+        content.into_bytes()
+    }
 }
 
 #[derive(Debug)]
@@ -334,6 +361,7 @@ mod tests {
     use crate::object::File;
 
     use super::Blob;
+    use super::Commit;
     use super::Mode;
     use super::Object;
     use super::Tree;
@@ -370,6 +398,53 @@ mod tests {
             panic!("expected a tree");
         };
         assert_eq!(parsed, tree);
+    }
+
+    fn test_commit() -> Commit {
+        Commit {
+            tree: "1234567890abcdef1234567890abcdef12345678".to_string(),
+            parent: "aaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbb".to_string(),
+            author: "Bob <bob@bob.test>".to_string(),
+            committer: "Alice <alice@alice.test>".to_string(),
+            encoding: String::new(),
+            message: "hello".to_string(),
+        }
+    }
+
+    #[test]
+    fn test_commit_to_bytes() {
+        assert_eq!(
+            std::str::from_utf8(&test_commit().to_bytes()).unwrap(),
+            "tree 1234567890abcdef1234567890abcdef12345678\n\
+             parent aaaaaaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbbbbb\n\
+             author Bob <bob@bob.test>\n\
+             committer Alice <alice@alice.test>\n\
+             \nhello"
+        );
+    }
+
+    #[test]
+    fn test_commit_to_bytes_no_parent_with_encoding() {
+        let commit = Commit {
+            parent: String::new(),
+            encoding: "UTF-8".to_string(),
+            ..test_commit()
+        };
+        let bytes = commit.to_bytes();
+        let text = std::str::from_utf8(&bytes).unwrap();
+        assert!(!text.contains("parent"));
+        assert!(text.contains("committer Alice <alice@alice.test>\nencoding UTF-8\n\nhello"));
+    }
+
+    #[test]
+    fn test_commit_to_bytes_from_bytes() {
+        let commit = test_commit();
+        let content = commit.to_bytes();
+        let data = [format!("commit {}\0", content.len()).into_bytes(), content].concat();
+        let Object::Commit(parsed) = Object::from_bytes(&data).unwrap() else {
+            panic!("expected a commit");
+        };
+        assert_eq!(parsed, commit);
     }
 
     #[test]
