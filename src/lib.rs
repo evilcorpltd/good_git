@@ -4,6 +4,7 @@ use anyhow::Result;
 use object::Object;
 use repo::Repo;
 
+pub mod index;
 pub mod object;
 pub mod refs;
 pub mod repo;
