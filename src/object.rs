@@ -1,4 +1,4 @@
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result, anyhow, bail};
 use flate2::read::ZlibDecoder;
 use sha1::{Digest, Sha1};
 use std::{fs, io::prelude::*};
@@ -114,7 +114,7 @@ impl Object {
         let mut content = &s[header_end + 1..];
 
         if content.len() != object_size {
-            return Err(anyhow!("Incorrect header length"));
+            bail!("Incorrect header length");
         }
 
         match object_type.as_str() {
@@ -200,7 +200,7 @@ impl Object {
 
     pub fn from_file(path: &std::path::Path) -> Result<Object> {
         if !path.exists() {
-            return Err(anyhow!("Expected file: {:?} does not exist", path));
+            bail!("Expected file: {:?} does not exist", path);
         }
         let data = std::fs::read(path).context("Could not read from file")?;
         let mut z = ZlibDecoder::new(&data[..]);

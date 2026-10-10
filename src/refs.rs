@@ -2,7 +2,7 @@ use std::fs;
 
 use crate::repo::Repo;
 
-use anyhow::{Result, anyhow};
+use anyhow::{Result, bail};
 
 /// Finds and resolves a Git reference to its commit hash.
 ///
@@ -15,7 +15,7 @@ use anyhow::{Result, anyhow};
 pub fn find_ref(reference: &str, repo: &Repo) -> Result<String> {
     let path = repo.git_dir().join(reference);
     if !path.exists() {
-        return Err(anyhow!("Reference not found: {reference}"));
+        bail!("Reference not found: {reference}");
     }
     let content = fs::read_to_string(path)?;
     if content.starts_with("ref: ") {
