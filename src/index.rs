@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, fs};
 
-use anyhow::{Result, anyhow};
+use anyhow::{Result, anyhow, bail};
 
 use crate::repo::Repo;
 
@@ -59,9 +59,7 @@ impl IndexEntry {
         let name_len = flags as usize & MAX_NAME_LEN;
         if name_len == MAX_NAME_LEN {
             // TODO: support long paths.
-            return Err(anyhow!(
-                "Paths of {MAX_NAME_LEN} bytes or longer are not supported"
-            ));
+            bail!("Paths of {MAX_NAME_LEN} bytes or longer are not supported");
         }
 
         let path_end = INDEX_ENTRY_HEADER_SIZE + name_len;
@@ -103,16 +101,16 @@ impl Index {
     /// -   sha-1 checksum (20 bytes)
     pub fn from_bytes(data: &[u8]) -> Result<Index> {
         if data.len() < HEADER_SIZE + CHECKSUM_SIZE {
-            return Err(anyhow!("Index file too short"));
+            bail!("Index file too short");
         }
         // TODO: Verify the checksum, the last CHECKSUM_SIZE bytes.
         let body = &data[..data.len() - CHECKSUM_SIZE];
         if &body[0..4] != b"DIRC" {
-            return Err(anyhow!("Incorrect header signature"));
+            bail!("Incorrect header signature");
         }
         let version = u32::from_be_bytes(body[4..8].try_into()?);
         if version != 2 {
-            return Err(anyhow!("Unsupported index version"));
+            bail!("Unsupported index version");
         }
 
         let index_count = u32::from_be_bytes(body[8..12].try_into()?);
