@@ -27,20 +27,7 @@ fn create_blob(dir: PathBuf, hash: &str, content: &str) {
 }
 
 fn create_tree(dir: PathBuf, hash: &str, tree: &Tree) {
-    // Format (one per file/folder/tree/submodule):
-    // [mode] [object name]\0[SHA-1 in binary format (20 bytes)]
-    let tree_content: Vec<u8> = tree
-        .files
-        .iter()
-        .flat_map(|file| {
-            let mut bytes = file.mode.mode_str().as_bytes().to_vec();
-            bytes.push(b' ');
-            bytes.extend(file.name.as_bytes());
-            bytes.push(0);
-            bytes.extend(&hex::decode(&file.hash).unwrap());
-            bytes
-        })
-        .collect();
+    let tree_content = tree.to_bytes().unwrap();
 
     let tree_header = format!("tree {}\0", tree_content.len()).into_bytes();
     let full_bytes = [tree_header, tree_content].concat();
