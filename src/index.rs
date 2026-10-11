@@ -1,6 +1,7 @@
 use std::{collections::BTreeMap, fs};
 
 use anyhow::{Result, anyhow, bail};
+use sha1::{Digest, Sha1};
 
 use crate::repo::Repo;
 
@@ -72,6 +73,22 @@ impl IndexEntry {
         let size = (path_end + 1).next_multiple_of(8);
         Ok((IndexEntry { mode, hash, path }, size))
     }
+
+    fn to_bytes(&self) -> Result<Vec<u8>> {
+        if self.path.len() >= MAX_NAME_LEN {
+            bail!("Paths of {MAX_NAME_LEN} bytes or longer are not supported");
+        }
+        let mut bytes = Vec::with_capacity(INDEX_ENTRY_HEADER_SIZE + self.path.len() + 1);
+        bytes.extend([0; 24]); // ctime, ctime nsec, mtime, mtime nsec, dev, ino
+        bytes.extend(self.mode.to_be_bytes());
+        bytes.extend([0; 12]); // uid, gid, size
+        bytes.extend(hex::decode(&self.hash)?); // sha-1
+        bytes.extend((self.path.len() as u16).to_be_bytes()); // flags and path length
+        bytes.extend(self.path.as_bytes());
+        // At least one NUL, padding up to a multiple of 8 bytes.
+        bytes.resize((bytes.len() + 1).next_multiple_of(8), 0);
+        Ok(bytes)
+    }
 }
 
 #[derive(Debug, Default, PartialEq)]
@@ -86,6 +103,22 @@ impl Index {
             return Ok(Index::default());
         }
         Index::from_bytes(&fs::read(path)?)
+    }
+
+    pub fn write(&self, repo: &Repo) -> Result<()> {
+        Ok(fs::write(repo.git_dir().join("index"), self.to_bytes()?)?)
+    }
+
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        let mut data = b"DIRC".to_vec(); // 4-byte signature
+        data.extend(2_u32.to_be_bytes()); // 4-byte version number
+        data.extend(u32::try_from(self.entries.len())?.to_be_bytes()); // 4 byte number of entries
+        // Entries, sorted by path name.
+        for entry in self.entries.values() {
+            data.extend(entry.to_bytes()?);
+        }
+        data.extend(Sha1::digest(&data)); // 20-byte checksum
+        Ok(data)
     }
 
     /// Parses an index file, from <https://git-scm.com/docs/index-format>.
@@ -317,6 +350,61 @@ mod tests {
 
         assert_eq!(
             Index::from_bytes(&data).unwrap_err().to_string(),
+            "Paths of 4095 bytes or longer are not supported"
+        );
+    }
+
+    #[test]
+    fn test_to_bytes_from_bytes() {
+        let entry = |path: &str| {
+            (
+                path.to_string(),
+                IndexEntry {
+                    mode: 0o100644,
+                    hash: "78981922613b2afb6025042ff6bd878ac1994e85".to_string(),
+                    path: path.to_string(),
+                },
+            )
+        };
+        let index = Index {
+            entries: BTreeMap::from([
+                entry("dir/file.txt"),
+                entry("a"),
+                entry("dir/dir2/file.txt"),
+                entry("ab"),
+            ]),
+        };
+        let data = index.to_bytes().unwrap();
+        assert_eq!(Index::from_bytes(&data).unwrap(), index);
+    }
+
+    #[test]
+    fn test_write_parsed_index() {
+        let data = test_index();
+        let index = Index::from_bytes(&data).unwrap();
+        let index_data = index.to_bytes().unwrap();
+
+        assert_eq!(index_data.len(), data.len());
+        // TODO: Enable this test. It fails now because we don't parse all fields, and the checksum
+        // is not set in the test data.
+        // assert_eq!(index_data, data);
+    }
+
+    #[test]
+    fn test_to_bytes_path_too_long() {
+        let path = "a".repeat(MAX_NAME_LEN);
+        let index = Index {
+            entries: BTreeMap::from([(
+                path.clone(),
+                IndexEntry {
+                    mode: 0o100644,
+                    hash: "78981922613b2afb6025042ff6bd878ac1994e85".to_string(),
+                    path: path.to_string(),
+                },
+            )]),
+        };
+        assert_eq!(
+            index.to_bytes().unwrap_err().to_string(),
             "Paths of 4095 bytes or longer are not supported"
         );
     }
